@@ -1,9 +1,28 @@
 # Financial Guard
 ### Real-Time Credit Card Transaction Monitoring & Fraud Detection
 
-Financial Guard is an end-to-end data engineering project that demonstrates real-time credit card transaction monitoring, rule-based fraud watchlist matching, automated email alerts, and interactive analytics using Apache Kafka and Azure Databricks.
+Financial Guard is an end-to-end data engineering project demonstrating real-time credit card transaction monitoring, rule-based fraud detection, automated email alerts, and interactive analytics using Apache Kafka, Confluent Cloud, and Azure Databricks.
 
-The solution integrates customer master data, streaming transactions, and fraud watchlist records into a unified data processing pipeline using the Medallion Architecture.
+The solution integrates customer master data, streaming transaction events, and fraud watchlist records into a unified data processing architecture using the **Medallion Architecture (Bronze, Silver, and Gold)**.
+
+---
+
+## Table of Contents
+
+- [Project Overview](#project-overview)
+- [Architecture](#architecture)
+- [Technology Stack](#technology-stack)
+- [Key Features](#key-features)
+- [Data Ingestion](#data-ingestion)
+- [Medallion Architecture](#medallion-architecture)
+- [Fraud Monitoring and Alerting](#fraud-monitoring-and-alerting)
+- [Dashboard](#dashboard)
+- [Project Evidence](#project-evidence)
+- [Repository Structure](#repository-structure)
+- [Setup and Configuration](#setup-and-configuration)
+- [Important Project Notes](#important-project-notes)
+- [Limitations and Future Improvements](#limitations-and-future-improvements)
+- [License](#license)
 
 ---
 
@@ -11,13 +30,23 @@ The solution integrates customer master data, streaming transactions, and fraud 
 
 Financial Guard monitors incoming credit card transactions and identifies potentially suspicious activity through configurable business rules and fraud watchlist matching.
 
-The project demonstrates three independent data ingestion paths:
+The project implements three independent data ingestion pipelines:
 
-1. **Customer Data:** Customer master records are ingested from Tiger Cloud PostgreSQL into Databricks.
-2. **Transaction Streaming:** Python-based producers generate transaction events and publish them to Confluent Cloud Kafka.
-3. **Fraud Watchlist:** Watchlist CSV records are converted into individual JSON files and ingested using Databricks Auto Loader.
+1. **Customer Master Data:** Customer records are ingested from Tiger Cloud PostgreSQL into Databricks through a configured ingestion pipeline.
+2. **Transaction Streaming:** Python-based producers generate synthetic transaction events and publish them to Confluent Cloud Kafka.
+3. **Fraud Watchlist:** Watchlist CSV records are converted into individual JSON files and ingested into Databricks using Auto Loader.
 
-The data is processed through Bronze, Silver, and Gold layers. Gold outputs feed automated email notification sinks and a Databricks Lakeview dashboard.
+The ingested data is processed through Bronze, Silver, and Gold layers. Gold outputs support automated email notifications and an interactive Databricks Lakeview dashboard.
+
+### Business Use Cases
+
+- Identify transactions exceeding customer-specific transaction limits.
+- Detect transactions involving cards present in a fraud watchlist.
+- Monitor transaction activity through tumbling and sliding-window aggregations.
+- Generate email notifications for high-value transactions and watchlist matches.
+- Analyse transaction trends and fraud-related activity through a dashboard.
+
+---
 
 ## Architecture
 
@@ -26,66 +55,75 @@ The data is processed through Bronze, Silver, and Gold layers. Gold outputs feed
 ### High-Level Data Flow
 
 ```text
-Tiger Cloud PostgreSQL
-          |
-          v
-   Customer Ingestion
-          |
-          v
-   Bronze / Silver Customers
-          |
-          +------------------------------+
-                                         |
-Python Transaction Producers             |
-          |                              |
-          v                              |
-   Confluent Cloud Kafka                 |
-          |                              |
-          v                              |
-   Bronze Transactions                   |
-          |                              |
-          v                              |
-   Silver Transactions                   |
-          |                              |
-          +---------------+--------------+
+                    CUSTOMER DATA
                           |
                           v
-                    Gold Layer
+               Tiger Cloud PostgreSQL
                           |
-             +------------+------------+
-             |                         |
-             v                         v
-      High-Value Alerts          Fraud Card Alerts
-             |                         |
-             v                         v
-      Email Alert Sink          Fraud Email Sink
+                          v
+                Databricks Ingestion
+                          |
+                          v
+                 Bronze / Silver
+                    Customers
+                          |
+                          |
+                          v
+TRANSACTION DATA                 FRAUD WATCHLIST
+      |                                |
+      v                                v
+Python Producers                  Watchlist CSV
+      |                                |
+      v                                v
+Confluent Cloud Kafka          Python JSON Generator
+      |                                |
+      v                                v
+Bronze Transactions          Unity Catalog Volume
+      |                                |
+      v                                v
+Silver Transactions              Auto Loader
+      |                                |
+      |                                v
+      |                         Bronze / Silver
+      |                            Watchlist
+      |                                |
+      +---------------+----------------+
+                      |
+                      v
+                  GOLD LAYER
+                      |
+          +-----------+-----------+
+          |           |           |
+          v           v           v
+      High-Value   Fraud Card  Transaction
+       Alerts       Alerts    Aggregations
+          |           |
+          v           v
+       Email        Email
+       Sink         Sink
+          |
+          v
+       Email Notifications
 
-
-Fraud Watchlist CSV
-          |
-          v
-   Python JSON Generator
-          |
-          v
-   Unity Catalog Volume
-          |
-          v
-     Auto Loader
-          |
-          v
-   Bronze Watchlist
-          |
-          v
-   Silver Watchlist
-          |
-          +------> Gold Fraud Card Alerts
-
-
-Gold Aggregations
-          |
-          v
-   Databricks Lakeview Dashboard
+             GOLD AGGREGATIONS
+                    |
+                    v
+        Databricks Lakeview Dashboard
 ```
+
+### Processing Flow
+
+| Stage | Description |
+|---|---|
+| Source | PostgreSQL, Kafka events, and fraud watchlist CSV |
+| Ingestion | Databricks ingestion pipeline, Kafka streaming, and Auto Loader |
+| Bronze | Raw source data and ingestion metadata |
+| Silver | Structured, standardised, and quality-checked records |
+| Gold | Business-oriented alert tables and transaction aggregations |
+| Notifications | Email alerts for high-value transactions and watchlist matches |
+| Visualization | Databricks Lakeview fraud monitoring dashboard |
+
+---
 
 ## Technology Stack
 
@@ -102,19 +140,22 @@ Gold Aggregations
 | Visualization | Databricks Lakeview Dashboard |
 | Notifications | Gmail SMTP with STARTTLS |
 
+---
+
 ## Key Features
 
-- Real-time transaction event ingestion through Kafka.
+- Real-time transaction event ingestion using Apache Kafka.
 - Synthetic normal and fraud-scenario transaction generation.
 - Customer master data ingestion from PostgreSQL.
-- File-based fraud watchlist ingestion using Auto Loader.
+- File-based fraud watchlist ingestion using Databricks Auto Loader.
 - Bronze, Silver, and Gold data processing layers.
 - Data quality expectations in Silver transaction processing.
-- High-value transaction alert generation.
-- Fraud watchlist card matching.
-- Tumbling and sliding-window transaction aggregations.
-- Automated email notifications.
-- Interactive fraud monitoring dashboard.
+- Customer-specific high-value transaction detection.
+- Fraud watchlist matching against transaction card numbers.
+- One-minute tumbling-window transaction aggregations.
+- Five-minute sliding-window aggregations with one-minute slides.
+- Automated email notifications using Gmail SMTP.
+- Interactive fraud monitoring and analytics dashboard.
 
 ---
 
@@ -122,17 +163,23 @@ Gold Aggregations
 
 ### 1. Customer Master Data
 
-Customer records are maintained in Tiger Cloud PostgreSQL and ingested into Databricks through a configured ingestion pipeline.
+Customer master records are maintained in Tiger Cloud PostgreSQL and ingested into Databricks through a configured ingestion pipeline.
 
-The customer data is processed into the Silver layer and used to enrich transaction and fraud alert records.
+The ingested records are processed into the Silver layer and used to enrich transaction and fraud alert datasets.
 
 ### 2. Transaction Streaming
 
-Python producers generate synthetic credit card transaction events and publish them to a Confluent Cloud Kafka topic.
+Python producers generate synthetic credit card transaction events and publish them to Confluent Cloud Kafka.
 
-The Databricks pipeline consumes Kafka messages and stores the original event payloads in the Bronze layer.
+The transaction producers support normal transactions and different fraud scenarios.
 
-The Silver layer parses the JSON payload and applies data quality expectations.
+The Databricks streaming pipeline:
+
+1. Consumes Kafka messages.
+2. Preserves the original event payload and Kafka metadata in Bronze.
+3. Parses the JSON transaction payload in Silver.
+4. Applies data quality expectations and standardisation.
+5. Makes structured transaction data available for Gold processing.
 
 ### 3. Fraud Watchlist Ingestion
 
@@ -140,34 +187,46 @@ Fraud watchlist records are maintained in CSV format.
 
 A Python utility converts individual CSV records into JSON files and places them in a Unity Catalog Volume.
 
-Databricks Auto Loader detects and ingests the JSON files into the Bronze watchlist table. The Silver layer applies standardisation and type conversion.
+Databricks Auto Loader detects and ingests the JSON files into the Bronze watchlist table.
+
+The Silver layer performs standardisation and data type conversion before the records are used in fraud matching.
 
 ---
 
 ## Medallion Architecture
 
+Financial Guard follows the Medallion Architecture to separate raw ingestion, data refinement, and business-level processing.
+
 ### Bronze Layer
 
 The Bronze layer stores incoming source data with minimal transformation.
 
-Main datasets:
+**Main datasets:**
 
 - `financial_guard.bronze.transactions`
 - `financial_guard.bronze.fraud_watchlist`
 
-The transaction Bronze table preserves Kafka metadata, including message key, payload, topic, partition, offset, timestamp, and ingestion timestamp.
+The transaction Bronze table preserves Kafka metadata, including:
+
+- Message key
+- Payload
+- Topic
+- Partition
+- Offset
+- Event timestamp
+- Ingestion timestamp
 
 ### Silver Layer
 
 The Silver layer transforms raw records into structured datasets.
 
-Main datasets:
+**Main datasets:**
 
 - `financial_guard.silver.transactions`
 - `financial_guard.silver.fraud_watchlist`
 - `financial_guard.silver.customers`
 
-Processing includes:
+**Processing includes:**
 
 - JSON parsing and schema application.
 - Data type conversion.
@@ -177,14 +236,14 @@ Processing includes:
 
 ### Gold Layer
 
-The Gold layer contains business-oriented outputs.
+The Gold layer contains business-oriented datasets used for fraud monitoring, notifications, and analytics.
 
 | Dataset | Purpose |
 |---|---|
-| `high_value_transaction_alert` | Identifies transactions exceeding configured customer transaction limits |
-| `fraud_card_alert` | Identifies transactions matching fraud watchlist card entries |
-| `transactions_count_by_minute` | Calculates transaction counts using one-minute tumbling windows |
-| `transactions_count_by_minute_sliding_window` | Calculates transaction counts using five-minute windows sliding every minute |
+| `financial_guard.gold.high_value_transaction_alert` | Identifies transactions exceeding configured customer transaction limits |
+| `financial_guard.gold.fraud_card_alert` | Identifies transactions matching fraud watchlist card entries |
+| `financial_guard.gold.transactions_count_by_minute` | Calculates transaction counts using one-minute tumbling windows |
+| `financial_guard.gold.transactions_count_by_minute_sliding_window` | Calculates transaction counts using five-minute windows sliding every minute |
 
 ---
 
@@ -192,28 +251,60 @@ The Gold layer contains business-oriented outputs.
 
 ### 1. High-Value Transaction Detection
 
-Transactions are compared against the configured transaction limit associated with the customer.
+Financial Guard compares incoming transaction amounts against the configured transaction limit associated with the customer.
+
+**Business rule:**
+
+```python
+transaction_amount > customer_transaction_limit
+```
 
 When a transaction exceeds the configured limit, the Gold processing logic generates a high-value transaction alert.
 
-The generated alert is passed to the email notification sink.
+The generated alert is passed to the high-value email notification sink.
 
 ### 2. Fraud Watchlist Matching
 
 Transaction card numbers are matched against card entries in the Silver fraud watchlist.
 
+**Matching condition:**
+
+```sql
+transactions.card_number = fraud_watchlist.entity_id
+```
+
 When a match is identified, the Gold processing logic generates an enriched fraud alert containing transaction and watchlist information.
 
-The alert includes details such as risk level, watchlist information, transaction details, and location comparison.
+The alert includes details such as:
 
-### 3. Automated Email Notifications
+- Risk level
+- Watchlist information
+- Transaction details
+- Location comparison
+
+### 3. Transaction Window Aggregations
+
+Financial Guard implements two types of transaction aggregations:
+
+| Aggregation | Configuration |
+|---|---|
+| Tumbling Window | One-minute window |
+| Sliding Window | Five-minute window, sliding every one minute |
+
+These aggregations support transaction activity monitoring through the Gold layer.
+
+### 4. Automated Email Notifications
 
 Two notification workflows are implemented:
 
-- High-value transaction notification.
-- Fraud watchlist match notification.
+| Notification Sink | Trigger |
+|---|---|
+| `email_alert_sink` | High-value transaction alerts |
+| `fraud_email_alert_sink` | Fraud watchlist matches |
 
-The notification sinks use Gmail SMTP with STARTTLS and retrieve credentials through Databricks secrets.
+The notification sinks use Gmail SMTP with STARTTLS.
+
+Credentials are retrieved through Databricks secrets rather than being embedded directly in the notification logic.
 
 Card numbers in fraud notification emails are masked.
 
@@ -221,39 +312,76 @@ Card numbers in fraud notification emails are masked.
 
 ## Dashboard
 
-Financial Guard includes a Databricks Lakeview dashboard with four pages.
+Financial Guard includes an interactive Databricks Lakeview dashboard with four analytical pages and 26 widgets.
 
-### Executive Overview
+### 1. Executive Overview
 
-Provides an overview of transaction activity, transaction volume, fraud alerts, high-value alerts, merchant categories, payment channels, and transaction trends.
+Provides an overview of:
 
-### Fraud Analytics
+- Total transaction activity.
+- Transaction volume.
+- Fraud alerts.
+- High-value alerts.
+- Merchant categories.
+- Payment channels.
+- Transaction trends.
 
-Displays risk-level distribution, location mismatch analysis, merchant-category insights, watchlist reasons, and recent fraud alerts.
+### 2. Fraud Analytics
 
-### Customer & Transaction Insights
+Provides insights into:
 
-Provides customer transaction analysis, top transaction cities, top customers by transaction volume, and high-value alert details.
+- Risk-level distribution.
+- Location mismatch analysis.
+- Merchant-category insights.
+- Watchlist reasons.
+- Recent fraud alerts.
 
-### Watchlist Monitoring
+### 3. Customer & Transaction Insights
 
-Displays active watchlist records, risk distribution, reporting sources, reason codes, reporting teams, and recent watchlist activity.
+Provides:
+
+- Customer transaction analysis.
+- Top transaction cities.
+- Top customers by transaction volume.
+- High-value alert details.
+
+### 4. Watchlist Monitoring
+
+Provides:
+
+- Active watchlist records.
+- Risk distribution.
+- Reporting sources.
+- Reason codes.
+- Reporting teams.
+- Recent watchlist activity.
 
 ---
 
-## Project Screenshots
+## Project Evidence
 
-Screenshots and demonstration recordings are organised under `docs/screenshots/` and `docs/videos/`.
+The following resources provide visual evidence of the implementation and historical execution.
+
+### Architecture
+
+[View System Architecture Diagram](docs/architecture/financial-guard-architecture.png)
+
+### Pipeline Demonstration
+
+[View Pipeline Demo Video](docs/videos/)
+
+### Screenshots
 
 | Component | Evidence |
 |---|---|
-| Pipeline execution | Databricks pipeline graph |
-| Continuous processing | Pipeline execution recording |
-| Kafka streaming | Confluent topic and message records |
-| Bronze and Silver | Transaction table screenshots |
-| Gold processing | Alert table screenshots |
-| Email notifications | High-value and fraud email examples |
-| Analytics | Four Lakeview dashboard pages |
+| Kafka Streaming | [Kafka Topics and Messages](docs/screenshots/kafka/) |
+| Fraud Watchlist | [Watchlist JSON Records](docs/screenshots/watchlist/) |
+| Databricks Pipeline | [Pipeline Execution Evidence](docs/screenshots/databricks-pipeline/) |
+| Databricks Tables | [Transaction and Alert Tables](docs/screenshots/databricks-tables/) |
+| Dashboard | [Four Dashboard Pages](docs/screenshots/dashboard/) |
+| Email Notifications | [Sample Email Alerts](docs/screenshots/email-alerts/) |
+
+**Evidence note:** Screenshots, email examples, and dashboard metrics are historical demonstrations using synthetic data. They do not represent live production monitoring.
 
 ---
 
@@ -266,41 +394,48 @@ financial-guard/
 ├── LICENSE
 ├── .gitignore
 │
-├── docs/
-│   ├── architecture/
-│   ├── screenshots/
-│   │   ├── pipeline/
-│   │   ├── kafka/
-│   │   ├── databricks/
-│   │   ├── dashboard/
-│   │   └── email-alerts/
-│   ├── videos/
-│   ├── WALKTHROUGH.md
-│   └── FILE_GUIDE.md
-│
 ├── kafka-producer/
 │   ├── producer_normal.py
 │   ├── producer_fraud_transaction.py
 │   ├── producer_fraud_card.py
-│   ├── consumer.py
 │   ├── config.py
+│   ├── customer_generator.py
+│   ├── merchant_generator.py
+│   ├── transaction_generator.py
 │   ├── fraud_engine.py
 │   ├── models.py
 │   ├── utils.py
+│   ├── consumer.py
 │   ├── requirements.txt
-│   ├── .env.example
 │   └── README.md
 │
-└── databricks/
-    ├── bronze/
-    ├── silver/
-    ├── gold/
-    ├── alerts/
-    ├── customer-ingestion/
-    └── dashboard/
+├── databricks/
+│   ├── bronze/
+│   ├── silver/
+│   ├── gold/
+│   ├── alerts/
+│   ├── customer-ingestion/
+│   ├── dashboard/
+│   └── fraud-watchlist/
+│
+└── docs/
+    ├── architecture/
+    │   ├── README.md
+    │   └── financial-guard-architecture.png
+    │
+    ├── screenshots/
+    │   ├── README.md
+    │   ├── kafka/
+    │   ├── watchlist/
+    │   ├── databricks-pipeline/
+    │   ├── databricks-tables/
+    │   ├── dashboard/
+    │   └── email-alerts/
+    │
+    └── videos/
+        ├── README.md
+        └── Recording 2026-11-01 152341.mp4
 ```
-
-*The repository structure may evolve as additional source files and documentation are added.*
 
 ---
 
@@ -315,13 +450,20 @@ financial-guard/
 - PostgreSQL source database
 - Gmail account configured for SMTP notifications
 
-### Python Producer Setup
-
-Clone the repository:
+### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/<your-github-username>/financial-guard.git
-cd financial-guard/kafka-producer
+git clone https://github.com/Trevor04sys/financial-guard.git
+
+cd financial-guard
+```
+
+### 2. Set Up the Python Environment
+
+Navigate to the Kafka producer directory:
+
+```bash
+cd kafka-producer
 ```
 
 Create a virtual environment:
@@ -330,10 +472,10 @@ Create a virtual environment:
 python -m venv venv
 ```
 
-Activate it on Windows:
+Activate it on Windows PowerShell:
 
-```bash
-venv\Scripts\activate
+```powershell
+.\venv\Scripts\Activate.ps1
 ```
 
 Install dependencies:
@@ -342,11 +484,15 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-Create a local `.env` file using `.env.example` as a template and configure the required Kafka connection settings.
+### 3. Configure Kafka Credentials
 
-Do not commit `.env` or any credentials.
+Create a local `.env` file using `.env.example` as a template.
 
-### Databricks Setup
+Configure the required Kafka connection settings.
+
+Do not commit `.env` or any credentials to GitHub.
+
+### 4. Configure Databricks
 
 1. Configure the required source connections.
 2. Create the required Unity Catalog catalog, schemas, and volume.
@@ -358,7 +504,7 @@ Do not commit `.env` or any credentials.
 8. Configure and run the Lakeflow pipeline.
 9. Import the Lakeview dashboard.
 
-The original Databricks workspace configuration, connections, secrets, and deployed pipeline settings may need to be recreated manually.
+**Reproduction note:** The original Databricks workspace configuration, connections, secrets, and deployed pipeline settings may need to be recreated manually.
 
 ---
 
@@ -366,12 +512,16 @@ The original Databricks workspace configuration, connections, secrets, and deplo
 
 - This is an educational and portfolio data engineering project using synthetic data.
 - Fraud identification is based on rule-based watchlist matching and configured business conditions, not a trained machine learning model.
-- The Confluent Cloud environment used during development was a free trial. The historical screenshots and recording demonstrate earlier successful streaming activity; the environment may need a new Kafka cluster and credentials to reproduce it.
-- Dashboard metrics are example results from the captured environment and are not live production metrics.
+- The Confluent Cloud environment used during development was a free trial. Historical screenshots and recordings demonstrate earlier successful streaming activity. A new Kafka cluster and credentials may be required to reproduce the pipeline.
+- Dashboard metrics are historical example results and are not live production metrics.
 - Email delivery depends on valid SMTP credentials and configuration.
 - This project is not a production banking or payment security system.
 
+---
+
 ## Limitations and Future Improvements
+
+Potential areas for further development:
 
 - Implement alert deduplication and idempotent notification handling.
 - Improve watchlist record deduplication and update handling.
@@ -386,9 +536,12 @@ The original Databricks workspace configuration, connections, secrets, and deplo
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
+---
+
 ## Author
 
 **Raj Pramalick**
 
 Data Engineering | Azure Databricks | Apache Kafka | PySpark | Python
 
+[GitHub Repository](https://github.com/Trevor04sys/financial-guard)
