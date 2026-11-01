@@ -50,7 +50,7 @@ The ingested data is processed through Bronze, Silver, and Gold layers. Gold out
 
 ## Architecture
 
-![Financial Guard Architecture](docs/architecture/financial-guard-architecture.png)
+![Financial Guard Architecture](docs/architecture/Financial%20Guard%20System%20Architecture.png)
 ### High-Level Data Flow
 
 ```text
@@ -363,7 +363,7 @@ The following resources provide visual evidence of the implementation and histor
 
 ### Architecture
 
-[View System Architecture Diagram](docs/architecture/financial-guard-architecture.png)
+[View System Architecture Diagram](docs/architecture/Financial%20Guard%20System%20Architecture.png)
 ### Pipeline Demonstration
 
 [View Pipeline Demo Video](docs/videos/)
