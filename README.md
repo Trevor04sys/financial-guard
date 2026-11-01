@@ -364,7 +364,7 @@ The following resources provide visual evidence of the implementation and histor
 
 ### Architecture
 
-[View System Architecture Diagram](docs/architecture/financial-guard-architecture.png)
+[View System Architecture Diagram](docs/architecture/Financial Guard System Architecture.png)
 
 ### Pipeline Demonstration
 
